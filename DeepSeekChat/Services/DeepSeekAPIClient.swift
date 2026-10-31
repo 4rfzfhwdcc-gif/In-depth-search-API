@@ -157,7 +157,8 @@ enum DeepSeekAPIClient {
                         guard case .invalidStream = apiError, !receivedText else {
                             throw apiError
                         }
-                        // Retry only when zero text was emitted by the streaming attempt.
+                        // Only retry if the streaming attempt yielded NO text. A
+                        // partial response must never be retried automatically.
                         let request = try makeRequest(
                             messages: messages, model: model,
                             thinkingEnabled: thinkingEnabled, reasoningEffort: reasoningEffort,
@@ -217,6 +218,7 @@ enum DeepSeekAPIClient {
 
         let contentType = (httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
         if contentType.contains("application/json") {
+            // A successful, non-SSE JSON response is valid as well.
             let data = try await readLimited(bytes, limit: 16 * 1024 * 1024)
             do {
                 onEvent(try DeepSeekStreamParser.parseNonStreamingResponse(data))
@@ -291,6 +293,7 @@ enum DeepSeekAPIClient {
         if let error = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
             return String(error.error.message.prefix(700))
         }
+        // Never print arbitrary raw HTML/body text from an intermediary.
         return "请检查模型设置、余额和网络连接。"
     }
 
