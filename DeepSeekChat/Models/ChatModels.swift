@@ -43,7 +43,7 @@ enum DeepSeekReasoningEffort: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// DeepSeek Chat Completions officially supports low / high / max.
+    /// DeepSeek Chat Completions supports low / high / max.
     var apiValue: String {
         switch self {
         case .instant: return "low"

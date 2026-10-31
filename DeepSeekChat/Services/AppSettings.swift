@@ -19,12 +19,16 @@ final class AppSettings: ObservableObject {
         selectedModel = DeepSeekModel(rawValue: storedModel) ?? .flash
         thinkingEnabled = UserDefaults.standard.bool(forKey: "thinkingEnabled")
         let storedEffort = UserDefaults.standard.string(forKey: "reasoningEffort") ?? ""
-        // Migrate V1.1 five-tier settings to the new three-tier picker.
+        // Migrate the previous five-tier setting to the new three-tier picker.
         switch storedEffort {
-        case "instant": reasoningEffort = .instant
-        case "medium", "high", "balanced": reasoningEffort = .balanced
-        case "extreme", "max": reasoningEffort = .max
-        default: reasoningEffort = .balanced
+        case "instant":
+            reasoningEffort = .instant
+        case "medium", "high", "balanced":
+            reasoningEffort = .balanced
+        case "extreme", "max":
+            reasoningEffort = .max
+        default:
+            reasoningEffort = .balanced
         }
     }
 }

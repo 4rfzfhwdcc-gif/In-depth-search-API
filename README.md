@@ -1,8 +1,8 @@
-# DeepSeek Chat V1.2 · 原生 iPhone App（SwiftUI）
+# DeepSeek Chat V1.2.1 · 原生 iPhone App（SwiftUI）
 
 独立、无第三方库的 iOS 17+ SwiftUI 工程，直接连接 DeepSeek 官方 API。
 
-## V1.2 功能
+## V1.2.1 功能
 
 - 默认模型：DeepSeek V4.1 Flash（API ID：`deepseek-flash`）
 - 保留 DeepSeek V4.0 Pro 选项（API ID：`deepseek-v4-pro`）
@@ -32,6 +32,17 @@ DeepSeek Chat Completions 官方支持 `low`、`high`、`max` 三档（关闭深
 | Max | `max` | 最高推理强度，适合复杂任务 |
 
 关闭深度思考时，推理强度选择器隐藏，并向 API 发送 `thinking: {"type":"disabled"}` 与 `reasoning_effort: "none"`。
+
+## V1.2.1 流式修复（2026-11-01）
+
+- 兼容 Chat Completions SSE 空事件、用量统计事件、只有角色没有文本的首帧以及最后的 `[DONE]` 不带空行的情况。
+- 正常处理 `Content-Type: application/json` 的非流式回复，不再直接报流式格式异常。
+- 当服务器流式响应格式异常且 **尚未收到任何文字或思考内容** 时，自动回退 **一次** 普通非流式请求。可能会产生额外一次 API 调用和费用；收到部分内容后不会自动重发。
+- 网络中断时保留部分已收到的回复，返回更清晰的错误原因；HTTP 401/402/429 仍直接提示，不会自动重试。
+- 保留 V1.2 的「即时 / 均衡 / Max」档位，旧档位偏好自动迁移。
+- 不更改 API Key 的 Keychain 保存方式、Bundle ID 或聊天记录文件格式。
+
+**重要：** 该补丁修复了已确认的解析器脆弱性，但没有用户的私有 API 响应样本，不能保证截图中问题的具体根因一定是同一个。请在重新构建 IPA 并安装后实测「你好」。
 
 ## API Key
 

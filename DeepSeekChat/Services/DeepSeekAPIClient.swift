@@ -77,7 +77,7 @@ enum ChatAPIError: LocalizedError {
     case invalidResponse
     case requestTooLarge
     case http(Int, String)
-    case invalidStream
+    case invalidStream(String)
 
     var errorDescription: String? {
         switch self {
@@ -94,8 +94,8 @@ enum ChatAPIError: LocalizedError {
             case 429: return "请求过于频繁，请稍后重试。\n\(message)"
             default: return "API 请求失败（HTTP \(status)）。\n\(message)"
             }
-        case .invalidStream:
-            return "服务器返回的流式数据不符合预期。"
+        case .invalidStream(let detail):
+            return "服务器流式响应异常：\(detail)"
         }
     }
 }
@@ -114,19 +114,6 @@ private struct ChatCompletionRequest: Encodable {
 
     struct ThinkingOption: Encodable {
         let type: String
-    }
-}
-
-private struct StreamChunk: Decodable {
-    let choices: [Choice]
-
-    struct Choice: Decodable {
-        let delta: Delta
-
-        struct Delta: Decodable {
-            let content: String?
-            let reasoning_content: String?
-        }
     }
 }
 
@@ -151,77 +138,36 @@ enum DeepSeekAPIClient {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    var request = URLRequest(url: endpoint)
-                    request.httpMethod = "POST"
-                    request.timeoutInterval = 120
-                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                    let body = try JSONEncoder().encode(
-                        ChatCompletionRequest(
-                            model: model.rawValue,
-                            messages: messages,
-                            stream: true,
-                            thinking: .init(type: thinkingEnabled ? "enabled" : "disabled"),
-                            reasoningEffort: thinkingEnabled ? reasoningEffort.apiValue : "none"
-                        )
-                    )
-                    // DeepSeek documents a 48 MiB request-body limit for inline image inputs.
-                    guard body.count <= 45 * 1024 * 1024 else {
-                        throw ChatAPIError.requestTooLarge
-                    }
-                    request.httpBody = body
-
-                    let configuration = URLSessionConfiguration.default
-                    configuration.timeoutIntervalForResource = 600
-                    let session = URLSession(configuration: configuration)
+                    let sessionConfig = URLSessionConfiguration.default
+                    sessionConfig.timeoutIntervalForResource = 600
+                    let session = URLSession(configuration: sessionConfig)
                     defer { session.invalidateAndCancel() }
 
-                    let (bytes, response) = try await session.bytes(for: request)
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        throw ChatAPIError.invalidResponse
-                    }
-                    guard (200...299).contains(httpResponse.statusCode) else {
-                        var data = Data()
-                        for try await byte in bytes {
-                            try Task.checkCancellation()
-                            if data.count >= 16_384 { break }
-                            data.append(byte)
+                    var receivedText = false
+                    do {
+                        let request = try makeRequest(
+                            messages: messages, model: model,
+                            thinkingEnabled: thinkingEnabled, reasoningEffort: reasoningEffort,
+                            apiKey: apiKey, stream: true
+                        )
+                        try await consumeStream(session: session, request: request) { event in
+                            if emit(event, into: continuation) { receivedText = true }
                         }
-                        let serverError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data)
-                        throw ChatAPIError.http(httpResponse.statusCode, serverError?.error.message ?? "")
-                    }
-
-                    var dataLines: [String] = []
-                    var receivedDone = false
-                    for try await line in bytes.lines {
-                        try Task.checkCancellation()
-                        if line.isEmpty {
-                            if !dataLines.isEmpty {
-                                let event = dataLines.joined(separator: "\n")
-                                dataLines.removeAll(keepingCapacity: true)
-                                if event == "[DONE]" {
-                                    receivedDone = true
-                                    break
-                                }
-                                try handleEvent(event, continuation: continuation)
-                            }
-                            continue
+                    } catch let apiError as ChatAPIError {
+                        guard case .invalidStream = apiError, !receivedText else {
+                            throw apiError
                         }
-                        if line.hasPrefix("data:") {
-                            dataLines.append(String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces))
-                        }
-                    }
-                    if !receivedDone && !dataLines.isEmpty {
-                        let event = dataLines.joined(separator: "\n")
-                        if event == "[DONE]" {
-                            receivedDone = true
-                        } else {
-                            try handleEvent(event, continuation: continuation)
-                        }
+                        // Only retry if the streaming attempt yielded NO text. A
+                        // partial response must never be retried automatically.
+                        let request = try makeRequest(
+                            messages: messages, model: model,
+                            thinkingEnabled: thinkingEnabled, reasoningEffort: reasoningEffort,
+                            apiKey: apiKey, stream: false
+                        )
+                        let event = try await fetchRegularResponse(session: session, request: request)
+                        _ = emit(event, into: continuation)
                     }
                     try Task.checkCancellation()
-                    guard receivedDone else { throw ChatAPIError.invalidStream }
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -231,24 +177,135 @@ enum DeepSeekAPIClient {
         }
     }
 
-    private static func handleEvent(
-        _ text: String,
-        continuation: AsyncThrowingStream<ChatStreamDelta, Error>.Continuation
-    ) throws {
-        guard let data = text.data(using: .utf8) else { return }
-        if let serverError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
-            throw ChatAPIError.http(200, serverError.error.message)
+    private static func makeRequest(
+        messages: [APIMessage], model: DeepSeekModel,
+        thinkingEnabled: Bool, reasoningEffort: DeepSeekReasoningEffort,
+        apiKey: String, stream: Bool
+    ) throws -> URLRequest {
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 120
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(stream ? "text/event-stream" : "application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let body = try JSONEncoder().encode(
+            ChatCompletionRequest(
+                model: model.rawValue,
+                messages: messages,
+                stream: stream,
+                thinking: .init(type: thinkingEnabled ? "enabled" : "disabled"),
+                reasoningEffort: thinkingEnabled ? reasoningEffort.apiValue : "none"
+            )
+        )
+        guard body.count <= 45 * 1024 * 1024 else { throw ChatAPIError.requestTooLarge }
+        request.httpBody = body
+        return request
+    }
+
+    private static func consumeStream(
+        session: URLSession,
+        request: URLRequest,
+        onEvent: (DeepSeekStreamEvent) -> Void
+    ) async throws {
+        let (bytes, response) = try await session.bytes(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ChatAPIError.invalidResponse
         }
-        guard let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data) else {
-            throw ChatAPIError.invalidStream
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let data = try await readLimited(bytes, limit: 16_384)
+            throw ChatAPIError.http(httpResponse.statusCode, serverMessage(data))
         }
-        for choice in chunk.choices {
-            if let reasoning = choice.delta.reasoning_content, !reasoning.isEmpty {
-                continuation.yield(.reasoning(reasoning))
+
+        let contentType = (httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
+        if contentType.contains("application/json") {
+            // A successful, non-SSE JSON response is valid as well.
+            let data = try await readLimited(bytes, limit: 16 * 1024 * 1024)
+            do {
+                onEvent(try DeepSeekStreamParser.parseNonStreamingResponse(data))
+            } catch let error as DeepSeekStreamParsingError {
+                if case .serverError(let message) = error { throw ChatAPIError.http(200, message) }
+                throw ChatAPIError.invalidStream("接口返回了 JSON，但不是有效的聊天回复。")
             }
-            if let content = choice.delta.content, !content.isEmpty {
-                continuation.yield(.content(content))
-            }
+            return
         }
+        if !contentType.isEmpty && !contentType.contains("text/event-stream") {
+            throw ChatAPIError.invalidStream("返回的 Content-Type 为 \(contentType)，并非流式聊天数据。")
+        }
+
+        var parser = DeepSeekStreamParser()
+        var receivedAnyText = false
+        do {
+            for try await line in bytes.lines {
+                try Task.checkCancellation()
+                if let event = try parser.acceptLine(line) {
+                    receivedAnyText = receivedAnyText || event.hasText
+                    onEvent(event)
+                    if event.done { break }
+                }
+            }
+            if !parser.sawDone, let trailing = try parser.flush() {
+                receivedAnyText = receivedAnyText || trailing.hasText
+                onEvent(trailing)
+            }
+        } catch let error as DeepSeekStreamParsingError {
+            if case .serverError(let message) = error {
+                throw ChatAPIError.http(200, message)
+            }
+            throw ChatAPIError.invalidStream(error.localizedDescription)
+        }
+        try Task.checkCancellation()
+        if parser.sawDone && receivedAnyText { return }
+        if parser.sawFinishReason && receivedAnyText { return }
+        throw ChatAPIError.invalidStream(
+            receivedAnyText
+                ? "网络连接在回复结束前断开，已保留收到的部分内容。"
+                : "连接结束但没有收到完整回复，可能是流式传输被代理或网络中断。"
+        )
+    }
+
+    private static func fetchRegularResponse(session: URLSession, request: URLRequest) async throws -> DeepSeekStreamEvent {
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw ChatAPIError.invalidResponse }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw ChatAPIError.http(httpResponse.statusCode, serverMessage(data))
+        }
+        guard data.count <= 16 * 1024 * 1024 else {
+            throw ChatAPIError.invalidStream("普通模式响应超过 16 MB，请缩短回答或新建对话。")
+        }
+        do {
+            return try DeepSeekStreamParser.parseNonStreamingResponse(data)
+        } catch let error as DeepSeekStreamParsingError {
+            if case .serverError(let message) = error { throw ChatAPIError.http(200, message) }
+            throw ChatAPIError.invalidStream("已尝试普通模式，但回复仍无法解析（\(error.localizedDescription)）。")
+        }
+    }
+
+    private static func emit(
+        _ event: DeepSeekStreamEvent,
+        into continuation: AsyncThrowingStream<ChatStreamDelta, Error>.Continuation
+    ) -> Bool {
+        for reasoning in event.reasoning { continuation.yield(.reasoning(reasoning)) }
+        for content in event.content { continuation.yield(.content(content)) }
+        return event.hasText
+    }
+
+    private static func serverMessage(_ data: Data) -> String {
+        if let error = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
+            return String(error.error.message.prefix(700))
+        }
+        // Never print arbitrary raw HTML/body text from an intermediary.
+        return "请检查模型设置、余额和网络连接。"
+    }
+
+    private static func readLimited(_ bytes: URLSession.AsyncBytes, limit: Int) async throws -> Data {
+        var data = Data()
+        for try await byte in bytes {
+            try Task.checkCancellation()
+            guard data.count < limit else {
+                throw ChatAPIError.invalidStream("服务端返回的数据量超出安全限制。")
+            }
+            data.append(byte)
+        }
+        return data
     }
 }
