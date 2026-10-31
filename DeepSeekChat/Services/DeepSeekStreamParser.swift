@@ -1,7 +1,8 @@
 import Foundation
 
-/// Parses Chat Completions SSE frames without assuming that each event has choices[0].delta.
-/// Kept independent of UIKit/SwiftUI to support lightweight parser tests.
+/// Parses DeepSeek Chat Completions SSE frames without assuming every data event
+/// carries `choices[0].delta`. This type is independent of UIKit/SwiftUI so it
+/// can be exercised with lightweight decoder tests.
 struct DeepSeekStreamEvent {
     var content: [String] = []
     var reasoning: [String] = []
@@ -33,6 +34,7 @@ struct DeepSeekStreamParser {
     private(set) var sawDone = false
     private(set) var sawFinishReason = false
 
+    /// Returns an event when a blank SSE delimiter is received.
     mutating func acceptLine(_ line: String) throws -> DeepSeekStreamEvent? {
         if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return try flush()
@@ -41,10 +43,12 @@ struct DeepSeekStreamParser {
             let value = String(line.dropFirst(5))
             dataLines.append(value.hasPrefix(" ") ? String(value.dropFirst()) : value)
         }
-        // Ignore SSE metadata and keep-alive comments.
+        // SSE comments (: keep-alive), ids, event names and retry fields are
+        // protocol metadata and do not contain Chat Completions tokens.
         return nil
     }
 
+    /// Handles a final `data: [DONE]` without a trailing blank line.
     mutating func flush() throws -> DeepSeekStreamEvent? {
         guard !dataLines.isEmpty else { return nil }
         let payload = dataLines.joined(separator: "\n")
@@ -87,10 +91,10 @@ struct DeepSeekStreamParser {
         }
         try throwIfServerError(root)
         var event = DeepSeekStreamEvent()
-        // Usage-only and service metadata events may have no choices.
+        // Usage-only or service metadata events may not contain `choices`.
         guard let choices = root["choices"] as? [[String: Any]] else { return event }
         for choice in choices {
-            if let reason = choice["finish_reason"] as? String, !reason.isEmpty {
+            if let finishReason = choice["finish_reason"] as? String, !finishReason.isEmpty {
                 event.finished = true
             }
             guard let delta = (choice["delta"] ?? choice["message"]) as? [String: Any] else {
@@ -106,6 +110,7 @@ struct DeepSeekStreamParser {
 
     private static func text(from value: Any?) -> String {
         if let string = value as? String { return string }
+        // Some OpenAI-compatible gateways send typed text parts instead of a string.
         if let parts = value as? [[String: Any]] {
             return parts.compactMap { $0["text"] as? String }.joined()
         }
@@ -118,8 +123,7 @@ struct DeepSeekStreamParser {
             throw DeepSeekStreamParsingError.serverError(description)
         }
         if let type = root["type"] as? String, type == "error" {
-            throw DeepSeekStreamParsingError.serverError(
-                (root["message"] as? String) ?? "未知 API 错误")
+            throw DeepSeekStreamParsingError.serverError((root["message"] as? String) ?? "未知 API 错误")
         }
     }
 }
