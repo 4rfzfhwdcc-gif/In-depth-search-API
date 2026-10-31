@@ -1,12 +1,12 @@
-# DeepSeek Chat V1.1 · 原生 iPhone App（SwiftUI）
+# DeepSeek Chat V1.2 · 原生 iPhone App（SwiftUI）
 
 独立、无第三方库的 iOS 17+ SwiftUI 工程，直接连接 DeepSeek 官方 API。
 
-## V1.1 功能
+## V1.2 功能
 
 - 默认模型：DeepSeek V4.1 Flash（API ID：`deepseek-flash`）
 - 保留 DeepSeek V4.0 Pro 选项（API ID：`deepseek-v4-pro`）
-- 深度思考开关；开启后可选「即时 / 中 / 高 / 极限 / Max」推理强度
+- 深度思考开关；开启后可选「即时 / 均衡 / Max」三档推理强度
 - SSE 流式聊天，分别接收回答与 `reasoning_content`
 - 图片发送：从系统相册多选，或使用相机拍照；每条消息最多 5 张
 - 图片在本机转为 JPEG，最长边缩放至 1600 px，单张不超过 2 MB
@@ -23,17 +23,15 @@
 
 ## 推理强度映射
 
-DeepSeek Chat Completions 当前实际支持 `low`、`high`、`max` 三档（关闭深度思考时使用 `none`）。为了保留用户要求的五个界面选项，映射如下：
+DeepSeek Chat Completions 官方支持 `low`、`high`、`max` 三档（关闭深度思考时使用 `none`）。App 直接提供一一对应的三个选项：
 
 | App 选项 | API `reasoning_effort` | 说明 |
 |---|---|---|
-| 即时 | `low` | 最低思考强度 |
-| 中 | `high` | DeepSeek 将 `medium` 归一化为 `high` |
-| 高 | `high` | 官方 high |
-| 极限 | `max` | 官方 max |
-| Max | `max` | 官方 max |
+| 即时 | `low` | 优先响应速度，较低推理强度 |
+| 均衡 | `high` | 兼顾速度与推理深度，默认档位 |
+| Max | `max` | 最高推理强度，适合复杂任务 |
 
-因此「中/高」以及「极限/Max」目前是相同的服务端强度，不代表 API 有五个独立档位。后续 DeepSeek 若开放更多强度档位，可再扩展映射。
+关闭深度思考时，推理强度选择器隐藏，并向 API 发送 `thinking: {"type":"disabled"}` 与 `reasoning_effort: "none"`。
 
 ## API Key
 

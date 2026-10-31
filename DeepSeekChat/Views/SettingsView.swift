@@ -101,7 +101,7 @@ struct SettingsView: View {
                     Text("聊天记录仅保存在此设备的 App 本地存储，卸载 App 通常会删除记录。")
                     Text("API 调用由 DeepSeek 按实际使用量计费；图片会转换为 JPEG 并随聊天请求发送。")
                     Text("图片最多每条消息 5 张；最长边压缩至 1600 px，单张不超过 2 MB。本地聊天记录会保存压缩图片，以便后续多轮对话继续引用。")
-                    Text("推理强度由官方 API 的 low / high / max 三档控制：‘中’与‘高’都会映射到 high，‘极限’与‘Max’都会映射到 max。")
+                    Text("推理强度由 DeepSeek 官方 API 的 low / high / max 三档控制：即时对应 low，均衡对应 high，Max 对应 max。")
                     Text("这是个人 API 客户端，不需要你部署中转服务器。")
                 }
                 .font(.footnote)

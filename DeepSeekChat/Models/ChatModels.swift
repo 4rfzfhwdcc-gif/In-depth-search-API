@@ -30,9 +30,7 @@ enum DeepSeekModel: String, CaseIterable, Identifiable, Codable {
 
 enum DeepSeekReasoningEffort: String, CaseIterable, Identifiable, Codable {
     case instant
-    case medium
-    case high
-    case extreme
+    case balanced
     case max
 
     var id: String { rawValue }
@@ -40,30 +38,25 @@ enum DeepSeekReasoningEffort: String, CaseIterable, Identifiable, Codable {
     var displayName: String {
         switch self {
         case .instant: return "即时"
-        case .medium: return "中"
-        case .high: return "高"
-        case .extreme: return "极限"
+        case .balanced: return "均衡"
         case .max: return "Max"
         }
     }
 
-    /// DeepSeek Chat Completions currently exposes low / high / max.
-    /// The requested UI levels are retained; some labels intentionally map to the same API tier.
+    /// DeepSeek Chat Completions officially supports low / high / max.
     var apiValue: String {
         switch self {
         case .instant: return "low"
-        case .medium, .high: return "high"
-        case .extreme, .max: return "max"
+        case .balanced: return "high"
+        case .max: return "max"
         }
     }
 
     var mappingDescription: String {
         switch self {
-        case .instant: return "映射为 API low：当前接口可用的最低思考强度。"
-        case .medium: return "映射为 API high：DeepSeek 将 medium 归一化为 high。"
-        case .high: return "映射为 API high。"
-        case .extreme: return "映射为 API max。"
-        case .max: return "映射为 API max：当前接口最高档。"
+        case .instant: return "API low：优先响应速度，使用较低推理强度。"
+        case .balanced: return "API high：兼顾响应速度与推理深度，推荐日常使用。"
+        case .max: return "API max：使用最高推理强度，适合复杂问题。"
         }
     }
 }
