@@ -1,0 +1,107 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00000000000000000000010B /* DeepSeekChatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000101 /* DeepSeekChatApp.swift */; };
+		00000000000000000000010C /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000102 /* ChatModels.swift */; };
+		00000000000000000000010D /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000103 /* KeychainService.swift */; };
+		00000000000000000000010E /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000104 /* AppSettings.swift */; };
+		00000000000000000000010F /* ChatStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000105 /* ChatStore.swift */; };
+		000000000000000000000110 /* DeepSeekAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000106 /* DeepSeekAPIClient.swift */; };
+		000000000000000000000111 /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000107 /* MessageRow.swift */; };
+		000000000000000000000112 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000108 /* SettingsView.swift */; };
+		000000000000000000000113 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000109 /* HistoryView.swift */; };
+		000000000000000000000114 /* ChatHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000010A /* ChatHomeView.swift */; };
+		000000000000000000000116 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000115 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		000000000000000000000101 /* DeepSeekChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepSeekChatApp.swift; sourceTree = "<group>"; };
+		000000000000000000000102 /* ChatModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModels.swift; sourceTree = "<group>"; };
+		000000000000000000000103 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		000000000000000000000104 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		000000000000000000000105 /* ChatStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStore.swift; sourceTree = "<group>"; };
+		000000000000000000000106 /* DeepSeekAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepSeekAPIClient.swift; sourceTree = "<group>"; };
+		000000000000000000000107 /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
+		000000000000000000000108 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		000000000000000000000109 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		00000000000000000000010A /* ChatHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHomeView.swift; sourceTree = "<group>"; };
+		000000000000000000000115 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		000000000000000000000117 /* DeepSeekChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepSeekChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		000000000000000000000120 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000118 /* Root */ = {isa = PBXGroup; children = ( 000000000000000000000119 /* DeepSeekChat */, 00000000000000000000011D /* Products */, ); sourceTree = "<group>"; };
+		000000000000000000000119 /* DeepSeekChat */ = {isa = PBXGroup; children = ( 000000000000000000000101 /* DeepSeekChatApp.swift */, 00000000000000000000011A /* Models */, 00000000000000000000011B /* Services */, 00000000000000000000011C /* Views */, 000000000000000000000115 /* Assets.xcassets */, ); path = DeepSeekChat; sourceTree = "<group>"; };
+		00000000000000000000011A /* Models */ = {isa = PBXGroup; children = ( 000000000000000000000102 /* ChatModels.swift */, ); path = Models; sourceTree = "<group>"; };
+		00000000000000000000011B /* Services */ = {isa = PBXGroup; children = ( 000000000000000000000103 /* KeychainService.swift */, 000000000000000000000104 /* AppSettings.swift */, 000000000000000000000105 /* ChatStore.swift */, 000000000000000000000106 /* DeepSeekAPIClient.swift */, ); path = Services; sourceTree = "<group>"; };
+		00000000000000000000011C /* Views */ = {isa = PBXGroup; children = ( 000000000000000000000107 /* MessageRow.swift */, 000000000000000000000108 /* SettingsView.swift */, 000000000000000000000109 /* HistoryView.swift */, 00000000000000000000010A /* ChatHomeView.swift */, ); path = Views; sourceTree = "<group>"; };
+		00000000000000000000011D /* Products */ = {isa = PBXGroup; children = ( 000000000000000000000117 /* DeepSeekChat.app */, ); sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000000000121 /* DeepSeekChat */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000128 /* Build configuration list for PBXNativeTarget "DeepSeekChat" */;
+			buildPhases = (00000000000000000000011E /* Sources */, 000000000000000000000120 /* Frameworks */, 00000000000000000000011F /* Resources */,);
+			buildRules = ();
+			dependencies = ();
+			name = DeepSeekChat;
+			productName = DeepSeekChat;
+			productReference = 000000000000000000000117 /* DeepSeekChat.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000122 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = { 000000000000000000000121 = { CreatedOnToolsVersion = 16.0; }; };
+			};
+			buildConfigurationList = 000000000000000000000125 /* Build configuration list for PBXProject "DeepSeekChat" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = zh-Hans;
+			hasScannedForEncodings = 0;
+			knownRegions = (zh-Hans, en, Base,);
+			mainGroup = 000000000000000000000118;
+			productRefGroup = 00000000000000000000011D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (000000000000000000000121 /* DeepSeekChat */,);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		00000000000000000000011F /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000116 /* Assets.xcassets in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		00000000000000000000011E /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( 00000000000000000000010B /* DeepSeekChatApp.swift in Sources */, 00000000000000000000010C /* ChatModels.swift in Sources */, 00000000000000000000010D /* KeychainService.swift in Sources */, 00000000000000000000010E /* AppSettings.swift in Sources */, 00000000000000000000010F /* ChatStore.swift in Sources */, 000000000000000000000110 /* DeepSeekAPIClient.swift in Sources */, 000000000000000000000111 /* MessageRow.swift in Sources */, 000000000000000000000112 /* SettingsView.swift in Sources */, 000000000000000000000113 /* HistoryView.swift in Sources */, 000000000000000000000114 /* ChatHomeView.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		000000000000000000000123 /* Debug */ = { isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; COPY_PHASE_STRIP = NO; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; DEBUG_INFORMATION_FORMAT = dwarf; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
+		000000000000000000000124 /* Release */ = { isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; COPY_PHASE_STRIP = NO; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; }; name = Release; };
+		000000000000000000000126 /* Debug */ = { isa = XCBuildConfiguration; buildSettings = { ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "DeepSeek Chat"; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity"; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 1.0.0; PRODUCT_BUNDLE_IDENTIFIER = com.example.deepseekchat; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1"; SWIFT_EMIT_LOC_STRINGS = YES; ENABLE_PREVIEWS = YES; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; }; name = Debug; };
+		000000000000000000000127 /* Release */ = { isa = XCBuildConfiguration; buildSettings = { ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "DeepSeek Chat"; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity"; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 1.0.0; PRODUCT_BUNDLE_IDENTIFIER = com.example.deepseekchat; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000000000000000000000125 /* Build configuration list for PBXProject "DeepSeekChat" */ = {isa = XCConfigurationList; buildConfigurations = (000000000000000000000123 /* Debug */, 000000000000000000000124 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		000000000000000000000128 /* Build configuration list for PBXNativeTarget "DeepSeekChat" */ = {isa = XCConfigurationList; buildConfigurations = (000000000000000000000126 /* Debug */, 000000000000000000000127 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+	};
+	rootObject = 000000000000000000000122 /* Project object */;
+}

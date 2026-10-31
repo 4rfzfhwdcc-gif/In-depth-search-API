@@ -1,0 +1,42 @@
+name: Build unsigned iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Build for physical iPhone (unsigned)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project DeepSeekChat.xcodeproj \
+            -scheme DeepSeekChat \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          mkdir -p output/Payload
+          cp -R "build/Build/Products/Release-iphoneos/DeepSeekChat.app" output/Payload/
+          cd output
+          zip -qry DeepSeekChat-unsigned.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSeekChat-unsigned-IPA
+          path: output/DeepSeekChat-unsigned.ipa
+          if-no-files-found: error
