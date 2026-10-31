@@ -2,7 +2,70 @@ import Foundation
 
 struct APIMessage: Encodable {
     let role: String
-    let content: String
+    let content: APIMessageContent
+
+    init(role: String, text: String, attachments: [ChatImageAttachment] = []) {
+        self.role = role
+        if attachments.isEmpty {
+            self.content = .text(text)
+        } else {
+            var parts: [APIContentPart] = []
+            if !text.isEmpty {
+                parts.append(.text(text))
+            }
+            parts.append(contentsOf: attachments.map(APIContentPart.image))
+            self.content = .parts(parts)
+        }
+    }
+}
+
+enum APIMessageContent: Encodable {
+    case text(String)
+    case parts([APIContentPart])
+
+    func encode(to encoder: Encoder) throws {
+        switch self {
+        case .text(let value):
+            var container = encoder.singleValueContainer()
+            try container.encode(value)
+        case .parts(let parts):
+            var container = encoder.unkeyedContainer()
+            for part in parts {
+                try container.encode(part)
+            }
+        }
+    }
+}
+
+struct APIContentPart: Encodable {
+    let type: String
+    let text: String?
+    let imageURL: APIImageURL?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case text
+        case imageURL = "image_url"
+    }
+
+    static func text(_ value: String) -> APIContentPart {
+        APIContentPart(type: "text", text: value, imageURL: nil)
+    }
+
+    static func image(_ attachment: ChatImageAttachment) -> APIContentPart {
+        let encoded = attachment.data.base64EncodedString()
+        let dataURL = "data:\(attachment.mimeType);base64,\(encoded)"
+        return APIContentPart(
+            type: "image_url",
+            text: nil,
+            imageURL: APIImageURL(url: dataURL, detail: "auto")
+        )
+    }
+}
+
+struct APIImageURL: Encodable {
+    let url: String
+    let detail: String
 }
 
 enum ChatStreamDelta {
@@ -12,6 +75,7 @@ enum ChatStreamDelta {
 
 enum ChatAPIError: LocalizedError {
     case invalidResponse
+    case requestTooLarge
     case http(Int, String)
     case invalidStream
 
@@ -19,8 +83,12 @@ enum ChatAPIError: LocalizedError {
         switch self {
         case .invalidResponse:
             return "服务器返回了无法识别的响应。"
+        case .requestTooLarge:
+            return "本次对话携带的图片过多，超过 API 请求体安全限制。请减少图片数量，或新建对话后再发送。"
         case .http(let status, let message):
             switch status {
+            case 400:
+                return "请求参数或图片格式不受支持，请检查模型、图片和推理设置。如果使用 V4.0 Pro 发送图片失败，请切换到 V4.1 Flash 重试。\n\(message)"
             case 401: return "API Key 无效或已失效，请在设置中检查。\n\(message)"
             case 402: return "API 账户余额不足，请检查 DeepSeek 开放平台。\n\(message)"
             case 429: return "请求过于频繁，请稍后重试。\n\(message)"
@@ -37,6 +105,12 @@ private struct ChatCompletionRequest: Encodable {
     let messages: [APIMessage]
     let stream: Bool
     let thinking: ThinkingOption
+    let reasoningEffort: String
+
+    enum CodingKeys: String, CodingKey {
+        case model, messages, stream, thinking
+        case reasoningEffort = "reasoning_effort"
+    }
 
     struct ThinkingOption: Encodable {
         let type: String
@@ -71,6 +145,7 @@ enum DeepSeekAPIClient {
         messages: [APIMessage],
         model: DeepSeekModel,
         thinkingEnabled: Bool,
+        reasoningEffort: DeepSeekReasoningEffort,
         apiKey: String
     ) -> AsyncThrowingStream<ChatStreamDelta, Error> {
         AsyncThrowingStream { continuation in
@@ -82,14 +157,20 @@ enum DeepSeekAPIClient {
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                    request.httpBody = try JSONEncoder().encode(
+                    let body = try JSONEncoder().encode(
                         ChatCompletionRequest(
                             model: model.rawValue,
                             messages: messages,
                             stream: true,
-                            thinking: .init(type: thinkingEnabled ? "enabled" : "disabled")
+                            thinking: .init(type: thinkingEnabled ? "enabled" : "disabled"),
+                            reasoningEffort: thinkingEnabled ? reasoningEffort.apiValue : "none"
                         )
                     )
+                    // DeepSeek documents a 48 MiB request-body limit for inline image inputs.
+                    guard body.count <= 45 * 1024 * 1024 else {
+                        throw ChatAPIError.requestTooLarge
+                    }
+                    request.httpBody = body
 
                     let configuration = URLSessionConfiguration.default
                     configuration.timeoutIntervalForResource = 600

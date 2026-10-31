@@ -79,14 +79,29 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("深度思考", isOn: $settings.thinkingEnabled)
+                    if settings.thinkingEnabled {
+                        Picker("推理强度", selection: $settings.reasoningEffort) {
+                            ForEach(DeepSeekReasoningEffort.allCases) { effort in
+                                Text(effort.displayName).tag(effort)
+                            }
+                        }
+                        Text(settings.reasoningEffort.mappingDescription)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                     Text(settings.selectedModel.description)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text("模型 ID：\(settings.selectedModel.rawValue)。DeepSeek 公告称自 2026-09-14 起 deepseek-v4-pro 请求临时路由至 V4.1 Flash，直到 V4.1-Pro 发布；App 保留 V4.0 Pro 选项，实际模型由服务端决定。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 Section("数据与费用") {
                     Text("聊天记录仅保存在此设备的 App 本地存储，卸载 App 通常会删除记录。")
-                    Text("API 调用由 DeepSeek 按实际使用量计费；V4 Pro 通常比 Flash 更贵。")
+                    Text("API 调用由 DeepSeek 按实际使用量计费；图片会转换为 JPEG 并随聊天请求发送。")
+                    Text("图片最多每条消息 5 张；最长边压缩至 1600 px，单张不超过 2 MB。本地聊天记录会保存压缩图片，以便后续多轮对话继续引用。")
+                    Text("推理强度由官方 API 的 low / high / max 三档控制：‘中’与‘高’都会映射到 high，‘极限’与‘Max’都会映射到 max。")
                     Text("这是个人 API 客户端，不需要你部署中转服务器。")
                 }
                 .font(.footnote)

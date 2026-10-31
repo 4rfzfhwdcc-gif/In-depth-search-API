@@ -37,14 +37,21 @@ final class ChatStore: ObservableObject {
     }
 
     @discardableResult
-    func addMessage(_ role: ChatRole, content: String, to conversationID: UUID) -> UUID? {
+    func addMessage(
+        _ role: ChatRole,
+        content: String,
+        attachments: [ChatImageAttachment] = [],
+        to conversationID: UUID
+    ) -> UUID? {
         guard let index = conversations.firstIndex(where: { $0.id == conversationID }) else { return nil }
-        let message = ChatMessage(role: role, content: content)
+        let message = ChatMessage(role: role, content: content, attachments: attachments)
         conversations[index].messages.append(message)
         conversations[index].updatedAt = Date()
         if role == .user && conversations[index].title == "新对话" {
             let firstLine = content.components(separatedBy: .newlines).first ?? content
-            conversations[index].title = String(firstLine.prefix(26))
+            conversations[index].title = firstLine.isEmpty && !attachments.isEmpty
+                ? "图片对话"
+                : String(firstLine.prefix(26))
         }
         sortConversations()
         scheduleSave()

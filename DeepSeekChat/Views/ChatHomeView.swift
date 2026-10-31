@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UIKit
 
 @MainActor
 struct ChatHomeView: View {
@@ -8,6 +10,11 @@ struct ChatHomeView: View {
 
     @State private var selectedID: UUID?
     @State private var draft = ""
+    @State private var selectedImages: [ChatImageAttachment] = []
+    @State private var photoPickerItems: [PhotosPickerItem] = []
+    @State private var showPhotoPicker = false
+    @State private var showImageSourceOptions = false
+    @State private var showCamera = false
     @State private var showHistory = false
     @State private var showSettings = false
     @State private var isStreaming = false
@@ -17,6 +24,7 @@ struct ChatHomeView: View {
     @State private var activeConversationID: UUID?
     @State private var errorText: String?
 
+    private let maxImagesPerMessage = 5
     private var current: ChatConversation? { store.conversation(selectedID) }
 
     var body: some View {
@@ -48,6 +56,13 @@ struct ChatHomeView: View {
                             }
                         }
                         Toggle("深度思考", isOn: $settings.thinkingEnabled)
+                        if settings.thinkingEnabled {
+                            Picker("推理强度", selection: $settings.reasoningEffort) {
+                                ForEach(DeepSeekReasoningEffort.allCases) { effort in
+                                    Text(effort.displayName).tag(effort)
+                                }
+                            }
+                        }
                     } label: {
                         HStack(spacing: 5) {
                             Text(settings.selectedModel.shortName)
@@ -79,6 +94,35 @@ struct ChatHomeView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
+            .sheet(isPresented: $showCamera) {
+                CameraImagePicker(
+                    onImage: { image in
+                        if let attachment = makeAttachment(from: image) {
+                            appendSelectedImage(attachment)
+                        }
+                        showCamera = false
+                    },
+                    onCancel: { showCamera = false }
+                )
+                .ignoresSafeArea()
+            }
+            .photosPicker(
+                isPresented: $showPhotoPicker,
+                selection: $photoPickerItems,
+                maxSelectionCount: max(1, maxImagesPerMessage - selectedImages.count),
+                matching: .images
+            )
+            .confirmationDialog("添加图片", isPresented: $showImageSourceOptions, titleVisibility: .visible) {
+                Button("从相册选择") { showPhotoPicker = true }
+                Button("拍照") {
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        showCamera = true
+                    } else {
+                        errorText = "当前设备没有可用的摄像头。"
+                    }
+                }
+                Button("取消", role: .cancel) { }
+            }
             .alert("请求失败", isPresented: Binding(
                 get: { errorText != nil },
                 set: { if !$0 { errorText = nil } }
@@ -90,6 +134,9 @@ struct ChatHomeView: View {
             }
             .onAppear {
                 if selectedID == nil { selectedID = store.conversations.first?.id }
+            }
+            .onChange(of: photoPickerItems) { _, items in
+                loadPickedImages(items)
             }
             .onChange(of: scenePhase) { phase in
                 if phase == .background { store.flush() }
@@ -140,7 +187,7 @@ struct ChatHomeView: View {
                 .background(.indigo.opacity(0.06), in: RoundedRectangle(cornerRadius: 28))
             Text("今天想聊些什么？")
                 .font(.title2.bold())
-            Text("DeepSeek \(settings.selectedModel.shortName) 已就绪\n输入问题，开始你的新对话")
+            Text("DeepSeek \(settings.selectedModel.shortName) 已就绪\n输入问题或添加图片，开始新对话")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -151,36 +198,141 @@ struct ChatHomeView: View {
     }
 
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            TextField("向 DeepSeek 发送消息…", text: $draft, axis: .vertical)
-                .lineLimit(1...5)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
-                .disabled(isStreaming)
-                .accessibilityLabel("输入消息")
-            Button {
-                if isStreaming { stop() } else { send() }
-            } label: {
-                Image(systemName: isStreaming ? "stop.fill" : "arrow.up")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 43, height: 43)
-                    .background(isStreaming ? Color.red : Color.indigo, in: Circle())
+        VStack(spacing: 8) {
+            if !selectedImages.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(selectedImages) { attachment in
+                            ZStack(alignment: .topTrailing) {
+                                if let image = UIImage(data: attachment.data) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 70, height: 70)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
+                                Button {
+                                    selectedImages.removeAll { $0.id == attachment.id }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 20))
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, .black.opacity(0.65))
+                                }
+                                .offset(x: 5, y: -5)
+                                .accessibilityLabel("移除图片")
+                            }
+                            .padding(.top, 5)
+                            .padding(.trailing, 5)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .frame(height: 80)
             }
-            .disabled(!isStreaming && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .opacity((!isStreaming && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) ? 0.4 : 1)
-            .accessibilityLabel(isStreaming ? "停止生成" : "发送消息")
+
+            HStack(alignment: .bottom, spacing: 9) {
+                Button {
+                    showImageSourceOptions = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(.indigo)
+                        .frame(width: 42, height: 42)
+                        .background(Color(uiColor: .secondarySystemBackground), in: Circle())
+                }
+                .disabled(isStreaming || selectedImages.count >= maxImagesPerMessage)
+                .accessibilityLabel("添加图片")
+
+                TextField("向 DeepSeek 发送消息…", text: $draft, axis: .vertical)
+                    .lineLimit(1...5)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
+                    .disabled(isStreaming)
+                    .accessibilityLabel("输入消息")
+
+                Button {
+                    if isStreaming { stop() } else { send() }
+                } label: {
+                    Image(systemName: isStreaming ? "stop.fill" : "arrow.up")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 43, height: 43)
+                        .background(isStreaming ? Color.red : Color.indigo, in: Circle())
+                }
+                .disabled(!isStreaming && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedImages.isEmpty)
+                .opacity((!isStreaming && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedImages.isEmpty) ? 0.4 : 1)
+                .accessibilityLabel(isStreaming ? "停止生成" : "发送消息")
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .background(.bar)
     }
 
+    private func loadPickedImages(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        let availableSlots = max(0, maxImagesPerMessage - selectedImages.count)
+        guard availableSlots > 0 else {
+            photoPickerItems = []
+            return
+        }
+        Task { @MainActor in
+            var loaded: [ChatImageAttachment] = []
+            for item in items.prefix(availableSlots) {
+                guard let data = try? await item.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data),
+                      let attachment = makeAttachment(from: image) else { continue }
+                loaded.append(attachment)
+            }
+            selectedImages.append(contentsOf: loaded)
+            photoPickerItems = []
+            if loaded.isEmpty {
+                errorText = "没有读取到可用图片，请选择 JPEG、PNG 或其他常见图片格式。"
+            }
+        }
+    }
+
+    private func makeAttachment(from image: UIImage) -> ChatImageAttachment? {
+        let maxSide: CGFloat = 1600
+        let originalSize = image.size
+        guard originalSize.width > 0, originalSize.height > 0 else { return nil }
+        let scale = min(1, maxSide / max(originalSize.width, originalSize.height))
+        let targetSize = CGSize(
+            width: max(1, (originalSize.width * scale).rounded()),
+            height: max(1, (originalSize.height * scale).rounded())
+        )
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+        var quality: CGFloat = 0.78
+        var jpegData = resized.jpegData(compressionQuality: quality)
+        while let currentData = jpegData, currentData.count > 2 * 1024 * 1024, quality > 0.48 {
+            quality -= 0.1
+            jpegData = resized.jpegData(compressionQuality: quality)
+        }
+        guard let data = jpegData, data.count <= 2 * 1024 * 1024 else {
+            errorText = "图片压缩后仍超过 2 MB，请换一张图片。"
+            return nil
+        }
+        return ChatImageAttachment(mimeType: "image/jpeg", data: data)
+    }
+
+    private func appendSelectedImage(_ attachment: ChatImageAttachment) {
+        guard selectedImages.count < maxImagesPerMessage else {
+            errorText = "每条消息最多发送 5 张图片。"
+            return
+        }
+        selectedImages.append(attachment)
+    }
+
     private func newConversation() {
         stop()
         selectedID = store.createConversation()
         draft = ""
+        selectedImages = []
     }
 
     private func stop() {
@@ -202,19 +354,21 @@ struct ChatHomeView: View {
     private func send() {
         guard !isStreaming else { return }
         let prompt = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty else { return }
+        guard !prompt.isEmpty || !selectedImages.isEmpty else { return }
         guard let apiKey = KeychainService.readAPIKey(), !apiKey.isEmpty else {
             showSettings = true
             return
         }
+
         let conversationID = selectedID ?? store.createConversation()
         selectedID = conversationID
-        guard store.addMessage(.user, content: prompt, to: conversationID) != nil else { return }
+        let outgoingImages = selectedImages
+        guard store.addMessage(.user, content: prompt, attachments: outgoingImages, to: conversationID) != nil else { return }
         draft = ""
+        selectedImages = []
 
         let outbound = (store.conversation(conversationID)?.messages ?? [])
-            .filter { !$0.content.isEmpty }
-            .map { APIMessage(role: $0.role.rawValue, content: $0.content) }
+            .map { APIMessage(role: $0.role.rawValue, text: $0.content, attachments: $0.attachments) }
         guard let answerID = store.addMessage(.assistant, content: "", to: conversationID) else { return }
 
         let requestID = UUID()
@@ -224,6 +378,7 @@ struct ChatHomeView: View {
         isStreaming = true
         let selectedModel = settings.selectedModel
         let thinkingEnabled = settings.thinkingEnabled
+        let reasoningEffort = settings.reasoningEffort
 
         requestTask = Task {
             do {
@@ -231,6 +386,7 @@ struct ChatHomeView: View {
                     messages: outbound,
                     model: selectedModel,
                     thinkingEnabled: thinkingEnabled,
+                    reasoningEffort: reasoningEffort,
                     apiKey: apiKey
                 ) {
                     guard !Task.isCancelled, activeRequestID == requestID else { break }
@@ -260,6 +416,49 @@ struct ChatHomeView: View {
                 requestTask = nil
                 store.flush()
             }
+        }
+    }
+}
+
+private struct CameraImagePicker: UIViewControllerRepresentable {
+    let onImage: (UIImage) -> Void
+    let onCancel: () -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        picker.allowsEditing = false
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) { }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onImage: onImage, onCancel: onCancel)
+    }
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        private let onImage: (UIImage) -> Void
+        private let onCancel: () -> Void
+
+        init(onImage: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+            self.onImage = onImage
+            self.onCancel = onCancel
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let image = info[.originalImage] as? UIImage {
+                onImage(image)
+            }
+            onCancel()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            onCancel()
         }
     }
 }

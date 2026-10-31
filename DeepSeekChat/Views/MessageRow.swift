@@ -18,6 +18,22 @@ struct MessageRow: View {
                     .background(.indigo.opacity(0.09), in: RoundedRectangle(cornerRadius: 11))
             }
             VStack(alignment: .leading, spacing: 10) {
+                if isUser && !message.attachments.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 7) {
+                            ForEach(message.attachments) { attachment in
+                                if let image = UIImage(data: attachment.data) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 116, height: 116)
+                                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if !isUser && !message.reasoning.isEmpty {
                     DisclosureGroup(isExpanded: $showReasoning) {
                         Text(message.reasoning)
@@ -34,8 +50,10 @@ struct MessageRow: View {
                 }
 
                 if isUser {
-                    Text(message.content)
-                        .textSelection(.enabled)
+                    if !message.content.isEmpty {
+                        Text(message.content)
+                            .textSelection(.enabled)
+                    }
                 } else if message.content.isEmpty {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
@@ -58,10 +76,12 @@ struct MessageRow: View {
                 }
             }
             .contextMenu {
-                Button {
-                    UIPasteboard.general.string = message.content
-                } label: {
-                    Label("复制内容", systemImage: "doc.on.doc")
+                if !message.content.isEmpty {
+                    Button {
+                        UIPasteboard.general.string = message.content
+                    } label: {
+                        Label("复制内容", systemImage: "doc.on.doc")
+                    }
                 }
             }
             if !isUser { Spacer(minLength: 4) }
