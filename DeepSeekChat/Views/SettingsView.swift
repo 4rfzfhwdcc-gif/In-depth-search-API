@@ -79,6 +79,10 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("深度思考", isOn: $settings.thinkingEnabled)
+                    Toggle("联网搜索", isOn: $settings.webSearchEnabled)
+                    Text("开启后，发送文字问题时会先调用 DeepSeek 官方 Search API，最多取回 5 条网页摘要，再交给当前模型整理回答。纯图片消息不会单独触发搜索。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     if settings.thinkingEnabled {
                         Picker("推理强度", selection: $settings.reasoningEffort) {
                             ForEach(DeepSeekReasoningEffort.allCases) { effort in
@@ -102,6 +106,7 @@ struct SettingsView: View {
                     Text("API 调用由 DeepSeek 按实际使用量计费；图片会转换为 JPEG 并随聊天请求发送。")
                     Text("图片最多每条消息 5 张；最长边压缩至 1600 px，单张不超过 2 MB。本地聊天记录会保存压缩图片，以便后续多轮对话继续引用。")
                     Text("推理强度由官方 API 的 low / high / max 三档控制：即时对应 low，均衡对应 high，Max 对应 max。")
+                    Text("联网搜索按 DeepSeek 官方 Search API 计费：每 1,000 次成功且返回结果的搜索请求为 0.75 美元；另计模型输入 Token 费用。无结果或失败请求不计搜索费用，具体以官方价格页为准。")
                     Text("这是个人 API 客户端，不需要你部署中转服务器。")
                 }
                 .font(.footnote)

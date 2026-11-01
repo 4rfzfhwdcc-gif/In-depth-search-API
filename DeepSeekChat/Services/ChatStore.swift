@@ -70,6 +70,38 @@ final class ChatStore: ObservableObject {
         scheduleSave()
     }
 
+    /// Retracts a user message and the assistant response immediately following it.
+    /// Messages are stored in alternating user/assistant order, so the next user
+    /// message is the boundary of the pair.
+    @discardableResult
+    func retractUserMessage(_ id: UUID, from conversationID: UUID) -> Bool {
+        guard let conversationIndex = conversations.firstIndex(where: { $0.id == conversationID }),
+              let messageIndex = conversations[conversationIndex].messages.firstIndex(where: { $0.id == id }),
+              conversations[conversationIndex].messages[messageIndex].role == .user else {
+            return false
+        }
+
+        let messages = conversations[conversationIndex].messages
+        var endIndex = messageIndex + 1
+        while endIndex < messages.count && messages[endIndex].role != .user {
+            endIndex += 1
+        }
+        conversations[conversationIndex].messages.removeSubrange(messageIndex..<endIndex)
+
+        if conversations[conversationIndex].messages.isEmpty {
+            conversations[conversationIndex].title = "新对话"
+        } else if let firstUser = conversations[conversationIndex].messages.first(where: { $0.role == .user }) {
+            let firstLine = firstUser.content.components(separatedBy: .newlines).first ?? firstUser.content
+            conversations[conversationIndex].title = firstLine.isEmpty && !firstUser.attachments.isEmpty
+                ? "图片对话"
+                : String(firstLine.prefix(26))
+        }
+        conversations[conversationIndex].updatedAt = Date()
+        sortConversations()
+        scheduleSave()
+        return true
+    }
+
     func removeMessage(_ id: UUID, from conversationID: UUID) {
         guard let index = conversations.firstIndex(where: { $0.id == conversationID }) else { return }
         conversations[index].messages.removeAll { $0.id == id }

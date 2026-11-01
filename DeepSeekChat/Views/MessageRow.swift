@@ -3,6 +3,7 @@ import UIKit
 
 struct MessageRow: View {
     let message: ChatMessage
+    let onRetract: () -> Void
     @State private var showReasoning = false
 
     private var isUser: Bool { message.role == .user }
@@ -81,6 +82,13 @@ struct MessageRow: View {
                         UIPasteboard.general.string = message.content
                     } label: {
                         Label("复制内容", systemImage: "doc.on.doc")
+                    }
+                }
+                if isUser {
+                    Button(role: .destructive) {
+                        onRetract()
+                    } label: {
+                        Label("撤回消息", systemImage: "arrow.uturn.backward")
                     }
                 }
             }

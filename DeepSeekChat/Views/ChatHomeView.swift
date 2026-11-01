@@ -21,8 +21,12 @@ struct ChatHomeView: View {
     @State private var requestTask: Task<Void, Never>?
     @State private var activeRequestID: UUID?
     @State private var activeAnswerID: UUID?
+    @State private var activeUserMessageID: UUID?
     @State private var activeConversationID: UUID?
     @State private var errorText: String?
+    @State private var pendingRetractionMessageID: UUID?
+    @State private var pendingRetractionConversationID: UUID?
+    @State private var showRetractionConfirmation = false
 
     private let maxImagesPerMessage = 5
     private var current: ChatConversation? { store.conversation(selectedID) }
@@ -56,6 +60,7 @@ struct ChatHomeView: View {
                             }
                         }
                         Toggle("深度思考", isOn: $settings.thinkingEnabled)
+                        Toggle("联网搜索", isOn: $settings.webSearchEnabled)
                         if settings.thinkingEnabled {
                             Picker("推理强度", selection: $settings.reasoningEffort) {
                                 ForEach(DeepSeekReasoningEffort.allCases) { effort in
@@ -69,6 +74,10 @@ struct ChatHomeView: View {
                                 .font(.subheadline.weight(.semibold))
                             if settings.thinkingEnabled {
                                 Image(systemName: "brain.head.profile")
+                                    .font(.caption)
+                            }
+                            if settings.webSearchEnabled {
+                                Image(systemName: "globe")
                                     .font(.caption)
                             }
                             Image(systemName: "chevron.down")
@@ -123,6 +132,17 @@ struct ChatHomeView: View {
                 }
                 Button("取消", role: .cancel) { }
             }
+            .confirmationDialog("撤回这条消息？", isPresented: $showRetractionConfirmation, titleVisibility: .visible) {
+                Button("撤回消息", role: .destructive) {
+                    confirmRetraction()
+                }
+                Button("取消", role: .cancel) {
+                    pendingRetractionMessageID = nil
+                    pendingRetractionConversationID = nil
+                }
+            } message: {
+                Text("将同时删除这条消息及其对应的 AI 回复（如果已生成）。仅影响本机聊天记录，无法收回已发送给 DeepSeek API 的内容。")
+            }
             .alert("请求失败", isPresented: Binding(
                 get: { errorText != nil },
                 set: { if !$0 { errorText = nil } }
@@ -149,7 +169,12 @@ struct ChatHomeView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
                     ForEach(conversation.messages) { message in
-                        MessageRow(message: message)
+                        MessageRow(message: message, onRetract: {
+                            guard message.role == .user else { return }
+                            pendingRetractionMessageID = message.id
+                            pendingRetractionConversationID = conversation.id
+                            showRetractionConfirmation = true
+                        })
                             .id(message.id)
                     }
                 }
@@ -335,6 +360,26 @@ struct ChatHomeView: View {
         selectedImages = []
     }
 
+    private func confirmRetraction() {
+        guard let messageID = pendingRetractionMessageID,
+              let conversationID = pendingRetractionConversationID else { return }
+
+        if activeConversationID == conversationID {
+            guard activeUserMessageID == messageID else {
+                errorText = "当前对话正在生成另一条回复，请先停止生成，再撤回较早的消息。"
+                pendingRetractionMessageID = nil
+                pendingRetractionConversationID = nil
+                return
+            }
+            stop()
+        }
+
+        _ = store.retractUserMessage(messageID, from: conversationID)
+        store.flush()
+        pendingRetractionMessageID = nil
+        pendingRetractionConversationID = nil
+    }
+
     private func stop() {
         requestTask?.cancel()
         requestTask = nil
@@ -346,6 +391,7 @@ struct ChatHomeView: View {
         }
         activeRequestID = nil
         activeAnswerID = nil
+        activeUserMessageID = nil
         activeConversationID = nil
         isStreaming = false
         store.flush()
@@ -363,7 +409,9 @@ struct ChatHomeView: View {
         let conversationID = selectedID ?? store.createConversation()
         selectedID = conversationID
         let outgoingImages = selectedImages
-        guard store.addMessage(.user, content: prompt, attachments: outgoingImages, to: conversationID) != nil else { return }
+        guard let userMessageID = store.addMessage(
+            .user, content: prompt, attachments: outgoingImages, to: conversationID
+        ) else { return }
         draft = ""
         selectedImages = []
 
@@ -374,11 +422,13 @@ struct ChatHomeView: View {
         let requestID = UUID()
         activeRequestID = requestID
         activeAnswerID = answerID
+        activeUserMessageID = userMessageID
         activeConversationID = conversationID
         isStreaming = true
         let selectedModel = settings.selectedModel
         let thinkingEnabled = settings.thinkingEnabled
         let reasoningEffort = settings.reasoningEffort
+        let webSearchQuery = settings.webSearchEnabled && !prompt.isEmpty ? prompt : nil
 
         requestTask = Task {
             do {
@@ -387,7 +437,8 @@ struct ChatHomeView: View {
                     model: selectedModel,
                     thinkingEnabled: thinkingEnabled,
                     reasoningEffort: reasoningEffort,
-                    apiKey: apiKey
+                    apiKey: apiKey,
+                    webSearchQuery: webSearchQuery
                 ) {
                     guard !Task.isCancelled, activeRequestID == requestID else { break }
                     switch delta {
@@ -411,6 +462,7 @@ struct ChatHomeView: View {
                 }
                 activeRequestID = nil
                 activeAnswerID = nil
+                activeUserMessageID = nil
                 activeConversationID = nil
                 isStreaming = false
                 requestTask = nil
